@@ -1,0 +1,15 @@
+*
+!.gitignore
+!Command/
+!Command/**
+!Config/
+!Config/**
+!Cache/
+!Log/
+!Security/
+!Security/**
+!Service/
+!Service/**
+!bootstrap.php
+!theme.php
+!wp.php
