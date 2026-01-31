@@ -1,5 +1,5 @@
 {
-    "name": "host-style/dokploy-wordpress",
+    "name": "host-style/dokpress",
     "version": "1.0.0",
     "description": "WordPress environment using Dokploy",
     "type": "project",
