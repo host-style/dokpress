@@ -1,0 +1,64 @@
+# Ambiente
+.env
+
+# WordPress Core
+public/wp-core/**
+
+# WordPress Config
+public/wp-config.php
+public/.htaccess
+
+# WordPress Content
+public/wp-content/uploads/
+public/wp-content/cache/
+public/wp-content/backup*/
+public/wp-content/upgrade/
+public/wp-content/backups/
+public/wp-content/blogs.dir/
+public/wp-content/updraft/
+
+# Plugins e Temas (descomentar se não versionar)
+# public/wp-content/plugins/
+# public/wp-content/themes/
+
+# WordPress Packages
+public/wp-content/languages/
+*.log
+
+# Docker volumes e logs
+.docker/nginx/log/*
+!.docker/nginx/log/.gitignore
+.docker/php/log/*
+!.docker/php/log/.gitignore
+
+# Backups
+backups/
+*.sql
+*.sql.gz
+
+# Node modules
+node_modules/
+public/wp-content/themes/*/node_modules/
+public/wp-content/plugins/*/node_modules/
+
+# Composer
+vendor/
+public/wp-content/themes/*/vendor/
+public/wp-content/plugins/*/vendor/
+
+# Build artifacts
+public/wp-content/themes/*/dist/
+*.min.js
+*.min.css
+*.map
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
