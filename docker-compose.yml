@@ -1,0 +1,115 @@
+services:
+  nginx:
+    build:
+      context: ./.docker/nginx
+      dockerfile: Dockerfile
+    ports:
+      - "${HTTP_PORT}"
+      - "${HTTPS_PORT}"
+    entrypoint: ["/docker-entrypoint.sh"]
+    volumes:
+      - ./.docker/nginx/default.conf.template:/etc/nginx/templates/site.conf.template
+      - ./.docker/nginx/certs:/etc/nginx/certs
+      - ./.docker/nginx/log:/var/log/nginx
+      - ./.docker/nginx/docker-entrypoint.sh:/docker-entrypoint.sh:ro
+      - ./:/var/www
+      - /var/projects/${APP_NAME}/uploads:/var/www/public/wp-content/uploads
+    environment:
+      - APP_DOMAIN=${APP_DOMAIN}
+    env_file:
+      - .env
+    depends_on:
+      - php-fpm
+    restart: unless-stopped
+    networks:
+      - app-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "200k"
+        max-file: "11"
+
+  php-fpm:
+    build:
+      context: ./.docker/php
+      dockerfile: Dockerfile
+    volumes:
+      - ./.docker/php/php.ini:/usr/local/etc/php/conf.d/custom.ini
+      - ./.docker/php/log:/var/log/php/
+      - ./:/var/www
+      - /var/projects/${APP_NAME}/uploads:/var/www/public/wp-content/uploads
+    depends_on:
+      - mariadb
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  mariadb:
+    image: mariadb:10.11
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./.docker/mariadb/custom.cnf:/etc/mysql/conf.d/custom.cnf
+      - ./.docker/mariadb/init:/docker-entrypoint-initdb.d:ro
+    env_file:
+      - .env
+    restart: unless-stopped
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru --appendonly yes
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  cli:
+    build:
+      context: ./.docker/php-cli
+      dockerfile: Dockerfile
+    volumes:
+      - ./.docker/php/php.ini:/usr/local/etc/php/conf.d/custom.ini
+      - ./.docker/php/log:/var/log/php/
+      - ./:/var/www
+    depends_on:
+      - mariadb
+      - redis
+    restart: unless-stopped
+    networks:
+      - app-network
+    environment:
+      - APP_ENV=${APP_ENV:-production}
+      - MYSQL_HOST=mariadb
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+    env_file:
+      - .env
+
+volumes:
+  db_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  app-network:
+    driver: bridge

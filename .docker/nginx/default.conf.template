@@ -1,0 +1,238 @@
+# Configuração de segurança - Ocultar versão do nginx
+server_tokens off;
+
+# Rate limiting - proteção contra DDoS e brute force
+limit_req_zone $binary_remote_addr zone=general:10m rate=10r/s;
+limit_req_zone $binary_remote_addr zone=login:10m rate=5r/m;
+limit_req_zone $binary_remote_addr zone=xmlrpc:10m rate=1r/m;
+limit_req_zone $binary_remote_addr zone=admin:10m rate=30r/m;
+limit_conn_zone $binary_remote_addr zone=addr:10m;
+
+# Detectar HTTPS corretamente
+map $http_x_forwarded_proto $fastcgi_https {
+    default off;
+    https on;
+}
+
+# Configuração de cache para arquivos estáticos
+map $sent_http_content_type $expires {
+    default                    off;
+    text/html                  epoch;
+    text/css                   1M;
+    application/javascript     1M;
+    application/json           epoch;
+    ~image/                    1y;
+    ~font/                     1y;
+    application/font-woff      1y;
+    application/font-woff2     1y;
+}
+
+# Bloquear bad bots e scanners conhecidos
+map $http_user_agent $bad_bot {
+    default 0;
+    ~*malicious 1;
+    ~*sqlmap 1;
+    ~*nikto 1;
+    ~*nmap 1;
+    ~*masscan 1;
+    ~*metasploit 1;
+}
+
+server {
+    listen 80;
+    listen 443 ssl;
+    server_name ${APP_DOMAIN} www.${APP_DOMAIN};
+
+    root /var/www/public;
+    index index.php index.html index.htm;
+
+    # SSL configuration
+    ssl_certificate /etc/nginx/certs/${APP_DOMAIN}.crt;
+    ssl_certificate_key /etc/nginx/certs/${APP_DOMAIN}.key;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
+    ssl_prefer_server_ciphers off;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 1d;
+    ssl_session_tickets off;
+
+    # Security Headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Permissions-Policy "geolocation=(), microphone=(), camera=()" always;
+
+    # Logs
+    access_log /var/log/nginx/access.log;
+    error_log /var/log/nginx/error.log;
+
+    # Limitar tamanho de upload
+    client_max_body_size 64M;
+    client_body_timeout 60s;
+    client_header_timeout 60s;
+
+    # Aplicar expiração de cache
+    expires $expires;
+
+    # Bloquear bots maliciosos
+    if ($bad_bot) {
+        return 403;
+    }
+
+    # Rate limiting geral
+    limit_req zone=general burst=20 nodelay;
+    limit_conn addr 10;
+
+    # ===== SEGURANÇA WORDPRESS =====
+
+    # Bloquear acesso a arquivos sensíveis
+    location ~* /(wp-config\.php|wp-config-sample\.php|readme\.html|license\.txt|\.htaccess|\.htpasswd|\.user\.ini) {
+        deny all;
+        return 404;
+    }
+
+    # Bloquear arquivos .git e .env
+    location ~ /\.(git|env|svn|hg) {
+        deny all;
+        return 404;
+    }
+
+    # Bloquear acesso a arquivos de log e backup
+    location ~* \.(log|sql|bak|old|orig|original|php#|php~|php_bak|save|swo|swp)$ {
+        deny all;
+        return 404;
+    }
+
+    # XMLRPC - Proteger com rate limiting
+    location = /wp-core/xmlrpc.php {
+        limit_req zone=xmlrpc burst=1 nodelay;
+
+        fastcgi_pass php-fpm:9000;
+        fastcgi_index index.php;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_param HTTPS $fastcgi_https;
+        include fastcgi_params;
+    }
+
+    # Proteção para wp-login.php
+    location = /wp-core/wp-login.php {
+        limit_req zone=login burst=5 nodelay;
+
+        fastcgi_pass php-fpm:9000;
+        fastcgi_index index.php;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_param HTTPS $fastcgi_https;
+        include fastcgi_params;
+        fastcgi_buffers 16 16k;
+        fastcgi_buffer_size 32k;
+    }
+
+    # Proteção para área administrativa
+    location ~* ^/wp-core/wp-admin/ {
+        limit_req zone=admin burst=50 nodelay;
+
+        location ~ \.php$ {
+            try_files $uri =404;
+            fastcgi_pass php-fpm:9000;
+            fastcgi_index index.php;
+            fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+            fastcgi_param HTTPS $fastcgi_https;
+            include fastcgi_params;
+            fastcgi_buffers 16 16k;
+            fastcgi_buffer_size 32k;
+            fastcgi_read_timeout 300s;
+        }
+    }
+
+    # Bloquear execução de PHP em uploads (CRÍTICO)
+    location ~* ^/wp-content/uploads/.*\.php$ {
+        deny all;
+        return 404;
+    }
+
+    # Permitir scripts PHP necessários em plugins/themes
+    location ~* ^/wp-content/(plugins|themes)/.+\.(php)$ {
+        location ~* (sample|example|test)\.php$ {
+            deny all;
+            return 404;
+        }
+
+        try_files $uri =404;
+        fastcgi_pass php-fpm:9000;
+        fastcgi_index index.php;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_param HTTPS $fastcgi_https;
+        include fastcgi_params;
+    }
+
+    # Proteger diretório wp-includes
+    location ~* ^/wp-core/wp-includes/.*\.php$ {
+        location ~* /wp-core/wp-includes/(js|css)/ {
+            try_files $uri =404;
+        }
+
+        deny all;
+        return 404;
+    }
+
+    # Cache para arquivos estáticos
+    location ~* \.(css|js|jpg|jpeg|png|gif|ico|svg|webp|avif|woff|woff2|ttf|eot|otf)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        add_header Access-Control-Allow-Origin "*";
+        access_log off;
+        log_not_found off;
+        add_header X-Content-Type-Options "nosniff" always;
+        try_files $uri =404;
+    }
+
+    # Favicon e robots.txt
+    location = /favicon.ico {
+        expires 1y;
+        access_log off;
+        log_not_found off;
+    }
+
+    location = /robots.txt {
+        expires 1d;
+        access_log off;
+        log_not_found off;
+    }
+
+    # WordPress permalinks
+    location / {
+        try_files $uri $uri/ /index.php?$args;
+    }
+
+    # Processar arquivos PHP gerais
+    location ~ \.php$ {
+        try_files $uri =404;
+
+        fastcgi_pass php-fpm:9000;
+        fastcgi_index index.php;
+        fastcgi_intercept_errors on;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_param HTTPS $fastcgi_https;
+        include fastcgi_params;
+
+        # Otimizações de buffer
+        fastcgi_buffers 16 16k;
+        fastcgi_buffer_size 32k;
+        fastcgi_read_timeout 300s;
+        fastcgi_send_timeout 300s;
+        fastcgi_keep_conn on;
+    }
+
+    # Bloquear acesso a diretórios ocultos
+    location ~ /\. {
+        deny all;
+        return 404;
+    }
+
+    # Negar acesso a arquivos de backup do editor
+    location ~* ~$ {
+        deny all;
+        return 404;
+    }
+}
