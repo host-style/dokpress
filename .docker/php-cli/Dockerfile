@@ -70,8 +70,7 @@ RUN if ! getent passwd 1000 > /dev/null 2>&1; then \
     fi
 
 # Create directories and set permissions for UID 1000
-RUN mkdir -p /var/www /home/user/.composer \
-    && chown -R 1000:1000 /var/www /home/user
+RUN mkdir -p /var/www /home/user/.composer
 
 # Install Node.js and Yarn via Alpine packages
 RUN apk add --no-cache nodejs npm \
@@ -91,9 +90,6 @@ RUN curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli
 # Copy entrypoint script
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
-
-# Switch to user 1000
-USER 1000
 
 WORKDIR /var/www
 
