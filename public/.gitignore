@@ -1,7 +1,5 @@
 *
 !.gitignore
-!catalogo
-!catalogo/**
 !wp-content
 !wp-content/**
-!./index.php
+!index.php

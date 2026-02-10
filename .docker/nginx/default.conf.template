@@ -2,10 +2,10 @@
 server_tokens off;
 
 # Rate limiting - proteção contra DDoS e brute force
-limit_req_zone $binary_remote_addr zone=general:10m rate=10r/s;
+limit_req_zone $binary_remote_addr zone=general:10m rate=100r/s;
 limit_req_zone $binary_remote_addr zone=login:10m rate=5r/m;
 limit_req_zone $binary_remote_addr zone=xmlrpc:10m rate=1r/m;
-limit_req_zone $binary_remote_addr zone=admin:10m rate=30r/m;
+limit_req_zone $binary_remote_addr zone=admin:10m rate=100r/s;
 limit_conn_zone $binary_remote_addr zone=addr:10m;
 
 # Detectar HTTPS corretamente
@@ -80,10 +80,6 @@ server {
         return 403;
     }
 
-    # Rate limiting geral
-    limit_req zone=general burst=20 nodelay;
-    limit_conn addr 10;
-
     # ===== SEGURANÇA WORDPRESS =====
 
     # Bloquear acesso a arquivos sensíveis
@@ -130,7 +126,7 @@ server {
 
     # Proteção para área administrativa
     location ~* ^/wp-core/wp-admin/ {
-        limit_req zone=admin burst=50 nodelay;
+        limit_req zone=admin burst=200 nodelay;
 
         location ~ \.php$ {
             try_files $uri =404;
@@ -166,17 +162,7 @@ server {
         include fastcgi_params;
     }
 
-    # Proteger diretório wp-includes
-    location ~* ^/wp-core/wp-includes/.*\.php$ {
-        location ~* /wp-core/wp-includes/(js|css)/ {
-            try_files $uri =404;
-        }
-
-        deny all;
-        return 404;
-    }
-
-    # Cache para arquivos estáticos
+    # Cache para arquivos estáticos (ANTES de bloquear PHP)
     location ~* \.(css|js|jpg|jpeg|png|gif|ico|svg|webp|avif|woff|woff2|ttf|eot|otf)$ {
         expires 1y;
         add_header Cache-Control "public, immutable";
@@ -185,6 +171,12 @@ server {
         log_not_found off;
         add_header X-Content-Type-Options "nosniff" always;
         try_files $uri =404;
+    }
+
+    # Proteger diretório wp-includes - bloquear SOMENTE arquivos PHP
+    location ~* ^/wp-core/wp-includes/.*\.php$ {
+        deny all;
+        return 404;
     }
 
     # Favicon e robots.txt
@@ -202,11 +194,15 @@ server {
 
     # WordPress permalinks
     location / {
+        limit_req zone=general burst=100 nodelay;
+        limit_conn addr 50;
         try_files $uri $uri/ /index.php?$args;
     }
 
     # Processar arquivos PHP gerais
     location ~ \.php$ {
+        limit_req zone=general burst=100 nodelay;
+        limit_conn addr 50;
         try_files $uri =404;
 
         fastcgi_pass php-fpm:9000;
