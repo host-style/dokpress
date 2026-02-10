@@ -101,7 +101,7 @@ $table_prefix = Environment::get('DB_TABLE_PREFIX');
  * @link https://wordpress.org/support/article/debugging-in-wordpress/
  * @link https://developer.wordpress.org/advanced-administration/wordpress/wp-config/#wp-debug
  */
-define('WP_DEBUG', $debug);
+define('WP_DEBUG', true);
 
 /* Add any custom values between this line and the "stop editing" line. */
 
@@ -128,7 +128,7 @@ define('WP_DEBUG_LOG', $logfile);
 
 // https://wordpress.org/support/article/debugging-in-wordpress/#wp_debug_display
 // Enabled only when WP_DEBUG is on in non-production environments and WP_DEBUG_LOG is off, otherwise check debug.log file.
-define('WP_DEBUG_DISPLAY', ($debug && !$prod));
+define('WP_DEBUG_DISPLAY', !$prod);
 
 // https://developer.wordpress.org/advanced-administration/wordpress/wp-config/#wp-disable-fatal-error-handler
 define('WP_DISABLE_FATAL_ERROR_HANDLER', $prod);
@@ -150,6 +150,9 @@ define('DISALLOW_FILE_EDIT', Environment::get('WP_BLOCK_UPDATE'));
 
 // https://developer.wordpress.org/advanced-administration/wordpress/wp-config/#disable-plugin-and-theme-update-and-installation
 define('DISALLOW_FILE_MODS', Environment::get('WP_BLOCK_UPDATE'));
+
+// https://developer.wordpress.org/advanced-administration/wordpress/wp-config/#wordpress-upgrade-constants
+if(!Environment::get('WP_BLOCK_UPDATE')) define('FS_METHOD', 'direct');
 
 // https://developer.wordpress.org/advanced-administration/wordpress/wp-config/#require-ssl-for-admin-and-logins
 define('FORCE_SSL_ADMIN', $prod);

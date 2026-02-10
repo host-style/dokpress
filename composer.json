@@ -1,8 +1,7 @@
 {
     "name": "host-style/dokpress",
-    "version": "1.0.2",
-    "description": "WordPress environment using Dokploy",
-    "type": "project",
+    "description": "Template for developing websites with WordPress",
+    "type": "template",
     "license": "proprietary",
     "authors": [
         {
@@ -21,7 +20,7 @@
         }
     ],
     "require": {
-        "php": "^8.4",
+        "php": "^8.3",
         "roots/wordpress": "*",
         "symfony/asset": "^7.2",
         "symfony/cache": "^7.2",

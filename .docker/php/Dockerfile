@@ -1,4 +1,4 @@
-FROM php:8.4-fpm-alpine
+FROM php:8.3-fpm-alpine
 
 # Start as root
 USER root
@@ -64,15 +64,22 @@ ENV PUID=${PUID}
 ARG PGID=1000
 ENV PGID=${PGID}
 
-RUN addgroup -g ${PGID} www-data || true \
-    && adduser -D -u ${PUID} -G www-data www-data || true \
-    && mkdir -p /var/www
+# Change www-data UID/GID to match host user (Alpine default is 82)
+RUN deluser www-data 2>/dev/null || true \
+    && delgroup www-data 2>/dev/null || true \
+    && addgroup -g ${PGID} www-data \
+    && adduser -D -u ${PUID} -G www-data -s /sbin/nologin www-data \
+    && mkdir -p /var/www \
+    && chown www-data:www-data /var/www
 
 # Set working directory
 WORKDIR /var/www
 
 # Install su-exec for running as non-root
 RUN apk add --no-cache su-exec
+
+# Copy PHP-FPM pool configuration
+COPY www.conf /usr/local/etc/php-fpm.d/www.conf
 
 # Expose port 9000 and start php-fpm server
 EXPOSE 9000
