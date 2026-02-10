@@ -54,12 +54,14 @@ class WordpressDeploy extends Command
         $commands[] = ['wp', 'language', 'core', 'install', 'pt_BR', '--activate', '--path=public/wp-core', '--allow-root'];
         $commands[] = ['wp', 'language', 'plugin', 'install', 'pt_BR', '--all', '--path=public/wp-core', '--allow-root'];
         $commands[] = ['wp', 'rewrite', 'flush', '--hard', '--path=public/wp-core', '--allow-root'];
-        // $commands[] = ['wp', 'core', 'verify-checksums', '--path=public/wp-core', '--allow-root'];
         $commands[] = ['wp', 'core', 'update-db', '--path=public/wp-core', '--allow-root'];
         $commands[] = ['wp', 'config', 'shuffle-salts', '--path=public/wp-core', '--allow-root'];
         $commands[] = ['wp', 'plugin', 'list', '--status=active', '--path=public/wp-core', '--allow-root'];
         $commands[] = ['wp', 'theme', 'list', '--status=active', '--path=public/wp-core', '--allow-root'];
         $commands[] = ['wp', 'transient', 'delete', '--expired', '--path=public/wp-core', '--allow-root'];
+        $commands[] = ['wp', 'language', 'core', 'update', '--path=public/wp-core', '--allow-root'];
+        $commands[] = ['wp', 'language', 'plugin', 'update', '--all', '--path=public/wp-core', '--allow-root'];
+        $commands[] = ['wp', 'language', 'theme', 'update', '--all', '--path=public/wp-core', '--allow-root'];
         $commands[] = ['wp', 'maintenance-mode', 'deactivate', '--path=public/wp-core', '--allow-root'];
 
         foreach ($commands as $cmd) {
